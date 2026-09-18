@@ -57,3 +57,5 @@ If you do not provide a Gemini key, the app still runs using mock AI responses f
 ## Notes
 - Live phone-call audio uses Pipecat + Gemini Live + Telnyx. That is not an Emergent dependency.
 - If MongoDB is not installed locally, you can point `MONGO_URL` to MongoDB Atlas instead.
+
+Staging deployment setup
