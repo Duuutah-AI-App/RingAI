@@ -586,7 +586,7 @@ JSON:"""
                 model=TEXT_MODEL,
                 contents=prompt,
                 config=types.GenerateContentConfig(
-                    temperature=0.0, max_output_tokens=5000,
+                    max_output_tokens=5000,
                     response_mime_type="application/json",  # JSON mode (optional)
                     thinking_config=_thinking_config("low"),
                 ),
@@ -2569,12 +2569,12 @@ async def get_conversation_response(
         # mirroring the old single system-message request.
         if contents:
             _cfg = types.GenerateContentConfig(
-                system_instruction=condensed_prompt, temperature=0.7, max_output_tokens=250,
+                system_instruction=condensed_prompt, max_output_tokens=250,
                 thinking_config=_thinking_config("low"))
             _contents = contents
         else:
             _cfg = types.GenerateContentConfig(
-                temperature=0.7, max_output_tokens=250,
+                max_output_tokens=250,
                 thinking_config=_thinking_config("low"))
             _contents = condensed_prompt
 
@@ -2629,7 +2629,6 @@ Return ONLY a JSON object with this exact structure:
 - price must be in cents (e.g., $12.99 = 1299)
 - allergens should be common allergens like: gluten, dairy, nuts, soy, eggs, shellfish
 - If a price is missing, set it to 0""",
-                temperature=0.2,
                 max_output_tokens=2000,
                 response_mime_type="application/json",  # JSON mode (optional)
                 thinking_config=_thinking_config("low"),
@@ -2778,7 +2777,6 @@ async def analyse_call_transcript(
             contents=f"TRANSCRIPT:\n{transcript_text}{menu_context}",
             config=types.GenerateContentConfig(
                 system_instruction=ANALYSIS_SYSTEM_PROMPT,
-                temperature=0.1,
                 max_output_tokens=700,
                 response_mime_type="application/json",  # JSON mode (optional)
                 thinking_config=_thinking_config("low"),
