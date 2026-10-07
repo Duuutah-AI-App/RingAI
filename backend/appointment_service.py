@@ -668,7 +668,7 @@ JSON:"""
             model=TEXT_MODEL,
             contents=prompt,
             config=types.GenerateContentConfig(
-                temperature=0.0, max_output_tokens=2000,
+                max_output_tokens=2000,
                 response_mime_type="application/json",  # JSON mode (optional)
                 thinking_config=_thinking_config("low"),
             ),
