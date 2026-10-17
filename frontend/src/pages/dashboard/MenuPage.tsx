@@ -676,8 +676,8 @@ const MenuPage = () => {
       </div>
 
       <Tabs defaultValue="items">
-        <div className="flex flex-col sm:flex-row gap-4 justify-between items-start">
-          <TabsList className="bg-cream rounded-xl p-1 h-auto">
+        <div className="flex flex-col sm:flex-row gap-4 justify-between items-stretch sm:items-start">
+          <TabsList className="bg-cream rounded-xl p-1 h-auto self-start">
             <TabsTrigger value="items" className="rounded-lg px-4 py-2 text-sm data-[state=active]:bg-card data-[state=active]:shadow-sm">
               <UtensilsCrossed className="w-4 h-4 mr-2" />Menu Items
             </TabsTrigger>
@@ -686,16 +686,18 @@ const MenuPage = () => {
             </TabsTrigger>
           </TabsList>
           <TabsContent value="items" className="mt-0">
-            <div className="flex items-center gap-2">
-              <Button onClick={handlePOSSync} disabled={syncing} variant="outline" className="rounded-xl">
-                <RefreshCw className={`w-4 h-4 mr-2 ${syncing ? "animate-spin" : ""}`} />
+            {/* Phones: Add Item full width on top, the two secondary actions side by
+                side below it. sm+: a single wrapping row in the original order. */}
+            <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center sm:justify-end">
+              <Button onClick={handlePOSSync} disabled={syncing} variant="outline" className="rounded-xl w-full sm:w-auto px-3 sm:px-4">
+                <RefreshCw className={`w-4 h-4 mr-2 shrink-0 ${syncing ? "animate-spin" : ""}`} />
                 {syncing ? "Syncing..." : "Sync from POS"}
               </Button>
-              {lastSync && <span className="text-xs text-ink-soft">Last synced: {lastSync}</span>}
-              <Button onClick={() => setImportOpen(true)} variant="outline" className="rounded-xl">
-                <Upload className="w-4 h-4 mr-2" /> Import Menu
+              {lastSync && <span className="col-span-2 order-last sm:order-none text-xs text-ink-soft">Last synced: {lastSync}</span>}
+              <Button onClick={() => setImportOpen(true)} variant="outline" className="rounded-xl w-full sm:w-auto px-3 sm:px-4">
+                <Upload className="w-4 h-4 mr-2 shrink-0" /> Import Menu
               </Button>
-              <Button onClick={openAdd} className="bg-coral hover:bg-coral-deep text-white rounded-xl">
+              <Button onClick={openAdd} className="col-span-2 order-first sm:order-none bg-coral hover:bg-coral-deep text-white rounded-xl w-full sm:w-auto">
                 <Plus className="w-4 h-4 mr-2" /> Add Item
               </Button>
             </div>

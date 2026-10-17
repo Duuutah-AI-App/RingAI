@@ -75,7 +75,7 @@ export default function BusinessTab({
         <div className="space-y-2">
           <Label>Business Phone</Label>
           <Input value={restaurant?.business_phone || ""} onChange={(e) => setRestaurant({ ...restaurant, business_phone: e.target.value })} className="h-11 rounded-xl" />
-          <p className="text-xs text-ink-soft">Set up call forwarding for this number in Settings â†’ Phone & Forwarding.</p>
+          <p className="text-xs text-ink-soft">Set up call forwarding for this number in Settings → Phone & Forwarding.</p>
         </div>
         <div className="space-y-2"><Label>Billing Email</Label><Input value={restaurant?.billing_email || ""} onChange={(e) => setRestaurant({ ...restaurant, billing_email: e.target.value })} className="h-11 rounded-xl" /></div>
 

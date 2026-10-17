@@ -116,7 +116,7 @@ const SettingsPage = () => {
         payload.reservation_advance_booking_days = Number(restaurant?.reservation_advance_booking_days || 7);
       }
       await updateRestaurant(restaurantId, payload);
-      // Escalation phone is owned by the Phone & Forwarding tab â€” it
+      // Escalation phone is owned by the Phone & Forwarding tab — it
       // persists to RestaurantConfig directly and is not part of this save.
       await refreshSession(restaurantId);
       toast.success(`${getBusinessLabel(businessType)} info saved!`);
@@ -149,7 +149,7 @@ const SettingsPage = () => {
         payload.delivery_enabled = config?.delivery_enabled;
         payload.delivery_minimum = Number(config?.delivery_minimum || 0);
       }
-      // Slot scheduling intentionally NOT sent â€” managed in the Appointments section.
+      // Slot scheduling intentionally NOT sent — managed in the Appointments section.
       await updateConfig(restaurantId, payload);
       await refreshSession(restaurantId);
       toast.success("Settings saved!");
@@ -161,7 +161,7 @@ const SettingsPage = () => {
   };
 
   // Fulfillment spans two docs (restaurant + config). One atomic backend call
-  // writes both or neither â€” no silent partial save (C21-4).
+  // writes both or neither — no silent partial save (C21-4).
   const saveFulfillment = async () => {
     setSaving(true);
     try {

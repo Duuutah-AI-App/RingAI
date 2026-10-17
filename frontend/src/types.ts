@@ -80,6 +80,14 @@ export interface DashboardStats {
   avg_quality_score?: number;
   ai_containment_rate?: number;
   escalated_calls?: number;
+  // Period-scoped versions of the three all-time figures above. Older backends
+  // don't send them; the dashboard then falls back and labels values "all time".
+  avg_quality_this_week?: number;
+  avg_quality_this_month?: number;
+  ai_containment_rate_this_week?: number;
+  ai_containment_rate_this_month?: number;
+  escalated_this_week?: number;
+  escalated_this_month?: number;
   daily_call_data?: ChartDatum[];
   monthly_call_data?: ChartDatum[];
   top_items?: TopItem[];

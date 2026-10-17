@@ -22,7 +22,7 @@ export default function FulfillmentTab({ restaurant, setRestaurant, config, setC
     <Card className="dash-card p-6 space-y-6">
       <div>
         <h3 className="font-display font-bold text-lg mb-1">Fulfillment</h3>
-        <p className="text-sm text-ink-soft">How orders are fulfilled â€” pickup, delivery, reservations, and payment.</p>
+        <p className="text-sm text-ink-soft">How orders are fulfilled — pickup, delivery, reservations, and payment.</p>
       </div>
 
       {/* Capability toggles */}

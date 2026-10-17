@@ -16,13 +16,17 @@ function formatHour(h: unknown): string | null {
   return `${hr} ${n < 12 ? "AM" : "PM"}`;
 }
 
-function buildBriefing(calls: number, escalated: number, busiest: string | null, periodWord: string) {
+// `escalated` is null when only an all-time count is available; the sentence is
+// about this period, so the hand-off clause is left out instead of misstated.
+function buildBriefing(calls: number, escalated: number | null, busiest: string | null, periodWord: string) {
   if (!calls) {
     return `No calls yet this ${periodWord}. Your briefing fills in as Duuutah starts answering.`;
   }
   let s = `Duuutah answered ${calls} call${calls === 1 ? "" : "s"} this ${periodWord}`;
   if (busiest) s += `, busiest around ${busiest}`;
-  s += ". ";
+  s += ".";
+  if (escalated === null) return s;
+  s += " ";
   s += escalated > 0
     ? `${escalated} ${escalated === 1 ? "call needed" : "calls needed"} a human hand-off.`
     : "Every one was handled without a hand-off.";
@@ -149,9 +153,17 @@ const DashboardHome = () => {
   const periodWord = period === "weekly" ? "week" : "month";
   const calls = Number(period === "weekly" ? d.calls_this_week : d.calls_this_month) || 0;
   const revenue = Math.round((Number(period === "weekly" ? d.revenue_this_week : d.revenue_this_month) || 0) / 100);
-  const quality = Number(d.avg_quality_score) || 0;
-  const containment = Number(d.ai_containment_rate) || 0;
-  const escalated = Number(d.escalated_calls) || 0;
+  // Prefer figures for the selected period so the hero card and briefing describe
+  // one window. If the backend predates the per-period fields, fall back to the
+  // all-time values and say so rather than mixing windows silently.
+  const periodQuality = period === "weekly" ? d.avg_quality_this_week : d.avg_quality_this_month;
+  const periodContainment = period === "weekly" ? d.ai_containment_rate_this_week : d.ai_containment_rate_this_month;
+  const periodEscalated = period === "weekly" ? d.escalated_this_week : d.escalated_this_month;
+  const isAllTime = periodQuality === undefined || periodContainment === undefined || periodEscalated === undefined;
+  const quality = Number(isAllTime ? d.avg_quality_score : periodQuality) || 0;
+  const containment = Number(isAllTime ? d.ai_containment_rate : periodContainment) || 0;
+  const escalated = Number(isAllTime ? d.escalated_calls : periodEscalated) || 0;
+  const allTimeSuffix = isAllTime ? " · all time" : "";
   const chartData = (period === "weekly" ? d.daily_call_data : d.monthly_call_data) || [];
   const topItems = d.top_items || [];
   const maxCount = topItems.length ? Math.max(...topItems.map((t) => Number(t.count) || 0), 1) : 1;
@@ -161,7 +173,7 @@ const DashboardHome = () => {
     ? formatHour(hourly.reduce((a, b) => ((Number(b.calls) || 0) > (Number(a.calls) || 0) ? b : a)).hour)
     : null;
 
-  const briefing = buildBriefing(calls, escalated, busiest, periodWord);
+  const briefing = buildBriefing(calls, isAllTime ? null : escalated, busiest, periodWord);
   const dateLabel = new Date().toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" });
 
   return (
@@ -185,14 +197,14 @@ const DashboardHome = () => {
               </span>
               <div className="mb-1.5">
                 <p className="text-sm font-semibold leading-tight">calls answered</p>
-                <span className="chip b-coral mt-1 inline-block">{containment}% handled by AI</span>
+                {calls > 0 && <span className="chip b-coral mt-1 inline-block">{containment}% handled by AI{allTimeSuffix}</span>}
               </div>
             </div>
 
             <div className="flex gap-9">
               <div><p className="font-display font-extrabold text-2xl">${revenue.toLocaleString()}</p><p className="text-xs text-ink-soft mt-0.5">Revenue</p></div>
-              <div><p className="font-display font-extrabold text-2xl">{quality}<span className="text-base text-ink-soft">/100</span></p><p className="text-xs text-ink-soft mt-0.5">Quality</p></div>
-              <div><p className="font-display font-extrabold text-2xl">{escalated}</p><p className="text-xs text-ink-soft mt-0.5">Escalated</p></div>
+              <div><p className="font-display font-extrabold text-2xl">{quality}<span className="text-base text-ink-soft">/100</span></p><p className="text-xs text-ink-soft mt-0.5">Quality{allTimeSuffix}</p></div>
+              <div><p className="font-display font-extrabold text-2xl">{escalated}</p><p className="text-xs text-ink-soft mt-0.5">Escalated{allTimeSuffix}</p></div>
             </div>
 
             <div className="flex items-center gap-3 ml-auto">
@@ -211,7 +223,7 @@ const DashboardHome = () => {
           <div className="dash-card card-hover p-5 flex items-start gap-3.5" style={{ borderLeft: "4px solid #F2A93B" }}>
             <span className="h-9 w-9 rounded-xl flex items-center justify-center b-honey shrink-0"><AlertTriangle className="w-4 h-4" /></span>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold">{escalated} call{escalated === 1 ? "" : "s"} needed a human this {periodWord}</p>
+              <p className="text-sm font-semibold">{escalated} call{escalated === 1 ? "" : "s"} needed a human {isAllTime ? "in total" : `this ${periodWord}`}</p>
               <p className="text-xs text-ink-soft mt-0.5">Review the transcripts to see what those callers needed.</p>
             </div>
             <Link to="/dashboard/calls?status=ESCALATED" className="text-xs font-semibold text-coral hover:text-coral-deep shrink-0">Review →</Link>
@@ -262,7 +274,7 @@ const DashboardHome = () => {
 
         <div className="dash-card card-hover p-6">
           <p className="eyebrow mb-2">What they're ordering</p>
-          <h3 className="font-display font-bold text-lg mb-5">Top items</h3>
+          <h3 className="font-display font-bold text-lg mb-5">Top items <span className="text-xs font-medium text-ink-soft">· all time</span></h3>
           <div className="space-y-4">
             {topItems.length ? topItems.slice(0, 6).map((it) => (
               <div key={it.name}>

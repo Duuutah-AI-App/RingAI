@@ -105,7 +105,7 @@ export default function VoiceAndAITab({ restaurant, config, setConfig, saving, o
         </div>
       </div>
 
-      {/* Custom Greeting â€” Collapsible */}
+      {/* Custom Greeting — Collapsible */}
       <Collapsible open={greetingOpen} onOpenChange={setGreetingOpen}>
         <CollapsibleTrigger className="flex items-center gap-2 text-sm font-medium text-ink-soft hover:text-foreground transition-colors">
           <ChevronDown className={`w-4 h-4 transition-transform ${greetingOpen ? "rotate-180" : ""}`} />
@@ -130,7 +130,7 @@ export default function VoiceAndAITab({ restaurant, config, setConfig, saving, o
           <h4 className="text-sm font-semibold mb-1">Language Support</h4>
           <p className="text-xs text-ink-soft">
             {isProPlan(restaurant?.plan)
-              ? "Configure the AI's spoken language. With multilingual on, callers press a digit at the start to pick a language. Returning callers skip the menu â€” their last choice is remembered."
+              ? "Configure the AI's spoken language. With multilingual on, callers press a digit at the start to pick a language. Returning callers skip the menu — their last choice is remembered."
               : "Upgrade to Pro to let callers choose their language via IVR. Starter plans use the primary language only."}
           </p>
         </div>
@@ -193,7 +193,7 @@ export default function VoiceAndAITab({ restaurant, config, setConfig, saving, o
               })}
             </div>
             {(config?.additional_languages?.length ?? 0) === 0 && (
-              <p className="text-xs text-[#a26d0d]">âš  Select at least one additional language, or turn multilingual off.</p>
+              <p className="text-xs text-[#a26d0d]">⚠ Select at least one additional language, or turn multilingual off.</p>
             )}
           </div>
         )}

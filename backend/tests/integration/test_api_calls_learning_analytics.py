@@ -222,6 +222,11 @@ async def test_analytics_summary_empty(client, two_tenant_with_memberships):
     assert body["total_calls"] == 0
     assert body["calls_today"] == 0
     assert body["top_items"] == []
+    # Per-period metrics default to 0 (no division by zero) when there are no calls.
+    for period in ("week", "month"):
+        assert body[f"escalated_this_{period}"] == 0
+        assert body[f"avg_quality_this_{period}"] == 0
+        assert body[f"ai_containment_rate_this_{period}"] == 0
 
 
 async def test_analytics_summary_with_data(
@@ -256,6 +261,58 @@ async def test_analytics_summary_with_data(
     assert body["completed_calls"] == 1
     assert body["total_revenue"] == 2500
     assert body["top_items"][0]["name"] == "Pizza"
+
+
+async def test_analytics_summary_period_scoped_metrics(
+    client, two_tenant_with_memberships, patched_server_db
+):
+    """Quality / containment / escalations are also reported per week and per
+    month, so a call older than 30 days only counts toward the all-time fields."""
+    from datetime import datetime, timedelta, timezone
+
+    now = datetime.now(timezone.utc)
+    base = {
+        "restaurant_id": TENANT_A_ID,
+        "caller_number": "+15555550100",
+        "duration_seconds": 60,
+        "status": "COMPLETED",
+    }
+    await patched_server_db.call_records.insert_many(
+        [
+            # This week: AI-contained, quality 90.
+            {**base, "id": "c_week", "call_sid": "CAW", "started_at": now.isoformat(),
+             "contained_by_ai": True, "quality_score": 90},
+            # ~2 weeks ago: escalated, quality 70 (in month, not week).
+            {**base, "id": "c_month", "call_sid": "CAM",
+             "started_at": (now - timedelta(days=14)).isoformat(),
+             "escalated_to_human": True, "quality_score": 70},
+            # ~2 months ago: escalated, quality 10 (all-time only).
+            {**base, "id": "c_old", "call_sid": "CAO",
+             "started_at": (now - timedelta(days=60)).isoformat(),
+             "escalated_to_human": True, "quality_score": 10},
+        ]
+    )
+    response = client.get(
+        f"/api/restaurants/{TENANT_A_ID}/analytics/summary",
+        headers={"Authorization": "Bearer tenant_a"},
+    )
+    assert response.status_code == 200
+    body = response.json()
+
+    # All-time fields are unchanged.
+    assert body["total_calls"] == 3
+    assert body["escalated_calls"] == 2
+    assert body["avg_quality_score"] == pytest.approx(56.7)
+
+    assert body["calls_this_week"] == 1
+    assert body["escalated_this_week"] == 0
+    assert body["avg_quality_this_week"] == 90
+    assert body["ai_containment_rate_this_week"] == 100
+
+    assert body["calls_this_month"] == 2
+    assert body["escalated_this_month"] == 1
+    assert body["avg_quality_this_month"] == 80
+    assert body["ai_containment_rate_this_month"] == 50
 
 
 async def test_analytics_export_csv(

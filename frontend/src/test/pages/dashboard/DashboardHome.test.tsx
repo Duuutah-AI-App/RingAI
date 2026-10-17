@@ -72,6 +72,42 @@ describe("DashboardHome page (Duuutah AI overview)", () => {
     ).toBeInTheDocument();
   });
 
+  it("labels all-time figures instead of presenting them as this period's (older backend)", async () => {
+    const {
+      avg_quality_this_week, avg_quality_this_month,
+      ai_containment_rate_this_week, ai_containment_rate_this_month,
+      escalated_this_week, escalated_this_month,
+      ...legacy
+    } = SAMPLE_ANALYTICS_SUMMARY;
+    server.use(
+      http.get("*/api/restaurants/:id/analytics/summary", () => HttpResponse.json(legacy))
+    );
+
+    renderWithProviders(<Shell />);
+    await waitFor(() =>
+      expect(screen.getByText(/Duuutah answered 18 calls this week/i)).toBeInTheDocument()
+    );
+    expect(screen.queryByText(/a human hand-off/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/4 calls needed a human in total/i)).toBeInTheDocument();
+    expect(screen.getByText(/Quality · all time/i)).toBeInTheDocument();
+    expect(screen.getByText(/Escalated · all time/i)).toBeInTheDocument();
+  });
+
+  it("uses the selected period's escalations, not the all-time count", async () => {
+    server.use(
+      http.get("*/api/restaurants/:id/analytics/summary", () =>
+        HttpResponse.json({ ...SAMPLE_ANALYTICS_SUMMARY, escalated_calls: 9, escalated_this_week: 1 })
+      )
+    );
+
+    renderWithProviders(<Shell />);
+    await waitFor(() =>
+      expect(screen.getByText(/1 call needed a human hand-off/i)).toBeInTheDocument()
+    );
+    expect(screen.getByText(/1 call needed a human this week/i)).toBeInTheDocument();
+    expect(screen.queryByText(/all time/i, { selector: "p" })).not.toBeInTheDocument();
+  });
+
   it("renders top items when present in the analytics payload", async () => {
     server.use(
       http.get("*/api/restaurants/:id/analytics/summary", () =>

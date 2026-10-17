@@ -3145,6 +3145,22 @@ async def get_analytics_summary(restaurant_id: str, user: Dict[str, Any] = Depen
     calls_this_month = len(month_calls)
     revenue_this_month = sum(c.get("order_total", 0) for c in month_calls if c.get("order_total"))
 
+    # Period-scoped counterparts of the all-time quality / containment /
+    # escalation figures above, so the dashboard briefing ("N calls this week,
+    # X needed a hand-off") describes one consistent window. The all-time fields
+    # are kept unchanged for existing consumers.
+    def _period_stats(calls: List[Dict[str, Any]]) -> Dict[str, Any]:
+        scores = [c.get("quality_score", 0) for c in calls if c.get("quality_score")]
+        contained_n = sum(1 for c in calls if c.get("contained_by_ai"))
+        return {
+            "escalated": sum(1 for c in calls if c.get("escalated_to_human")),
+            "avg_quality": round(sum(scores) / len(scores), 1) if scores else 0,
+            "containment_rate": round(contained_n / len(calls) * 100, 1) if calls else 0,
+        }
+
+    week_stats = _period_stats(week_calls)
+    month_stats = _period_stats(month_calls)
+
     monthly_data = []
     for i in range(29, -1, -1):
         day = now - timedelta(days=i)
@@ -3217,6 +3233,12 @@ async def get_analytics_summary(restaurant_id: str, user: Dict[str, Any] = Depen
         "revenue_this_week": revenue_this_week,
         "calls_this_month": calls_this_month,
         "revenue_this_month": revenue_this_month,
+        "escalated_this_week": week_stats["escalated"],
+        "escalated_this_month": month_stats["escalated"],
+        "avg_quality_this_week": week_stats["avg_quality"],
+        "avg_quality_this_month": month_stats["avg_quality"],
+        "ai_containment_rate_this_week": week_stats["containment_rate"],
+        "ai_containment_rate_this_month": month_stats["containment_rate"],
         "monthly_call_data": monthly_data,
         "daily_call_data": daily_data,
         "hourly_distribution": hourly_data,
