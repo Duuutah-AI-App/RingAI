@@ -131,4 +131,12 @@ export async function mockApi(page: Page) {
   });
   // Real-time notifications socket: accept and stay silent.
   await page.routeWebSocket(/^wss?:\/\/api\.e2e\.test\//, () => {});
+  // index.css @imports Google Fonts. The window `load` event (which page.goto
+  // waits for) and `networkidle` both wait on that stylesheet and its font
+  // files, so a slow font CDN timed tests out after the page had rendered. Keep
+  // the suite off the network: empty stylesheet, so system fonts are used.
+  await page.route(/^https:\/\/fonts\.googleapis\.com\//, (route) =>
+    route.fulfill({ contentType: "text/css", body: "" }),
+  );
+  await page.route(/^https:\/\/fonts\.gstatic\.com\//, (route) => route.abort());
 }
