@@ -522,7 +522,10 @@
   background: radial-gradient(1100px 560px at 88% -8%, rgba(232,80,46,.12), transparent 60%),
               radial-gradient(900px 500px at 0% 100%, rgba(242,169,59,.08), transparent 55%);
 }
-.dash-surface > * { position: relative; z-index: 1; }
+/* Lift direct children above the ::before glow. :where() gives this rule zero
+   specificity so Tailwind position/z-index utilities on a child (fixed, absolute,
+   z-40, ...) still win; previously it forced overlays to position: relative. */
+:where(.dash-surface) > * { position: relative; z-index: 1; }
 
 .dash .dash-hero {
   background: rgba(255,253,249,.72);

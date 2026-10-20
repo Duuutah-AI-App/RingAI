@@ -107,7 +107,7 @@ export default function PhoneForwardingTab({
       await navigator.clipboard.writeText(aiNumber);
       toast.success("AI number copied to clipboard");
     } catch {
-      toast.error("Could not copy â€” please copy manually");
+      toast.error("Could not copy — please copy manually");
     }
   };
 
@@ -116,7 +116,7 @@ export default function PhoneForwardingTab({
     setShowEmptyWarning(!businessPhone?.trim());
 
     if (!restaurantId) {
-      toast.error("No active restaurant â€” refresh and try again");
+      toast.error("No active restaurant — refresh and try again");
       return;
     }
 
@@ -181,7 +181,7 @@ export default function PhoneForwardingTab({
   return (
     <div className="space-y-6">
       {/* ----------------------------------------------------------------- */}
-      {/* Section 1 â€” Your phone numbers                                    */}
+      {/* Section 1 — Your phone numbers                                    */}
       {/* ----------------------------------------------------------------- */}
       <Card className="dash-card p-6 space-y-5">
         <div>
@@ -200,7 +200,7 @@ export default function PhoneForwardingTab({
           </Alert>
         )}
 
-        {/* AI number â€” read-only with copy */}
+        {/* AI number — read-only with copy */}
         <div className="space-y-2">
           <Label htmlFor="ai-number">Duuutah AI number (read-only)</Label>
           <div className="flex gap-2">
@@ -234,7 +234,7 @@ export default function PhoneForwardingTab({
           </p>
         </div>
 
-        {/* Business phone â€” editable */}
+        {/* Business phone — editable */}
         <div className="space-y-2">
           <Label htmlFor="business-phone">Business phone</Label>
           <Input
@@ -259,7 +259,7 @@ export default function PhoneForwardingTab({
           </p>
         </div>
 
-        {/* Escalation phone â€” editable, optional */}
+        {/* Escalation phone — editable, optional */}
         <div className="space-y-2">
           <Label htmlFor="escalation-phone">Escalation phone</Label>
           <Input
@@ -304,7 +304,7 @@ export default function PhoneForwardingTab({
       </Card>
 
       {/* ----------------------------------------------------------------- */}
-      {/* Section 2 â€” Set up call forwarding                                */}
+      {/* Section 2 — Set up call forwarding                                */}
       {/* ----------------------------------------------------------------- */}
       <Card className="dash-card p-6 space-y-5">
         <div>
@@ -362,7 +362,7 @@ export default function PhoneForwardingTab({
       </Card>
 
       {/* ----------------------------------------------------------------- */}
-      {/* Section 3 â€” Verify your forwarding works                          */}
+      {/* Section 3 — Verify your forwarding works                          */}
       {/* ----------------------------------------------------------------- */}
       <Card className="dash-card p-6 space-y-4">
         <div>
@@ -393,9 +393,9 @@ export default function PhoneForwardingTab({
               You should hear: <em>"Welcome to {businessName}!"</em> or your AI's
               configured greeting.
             </li>
-            <li>If you hear the AI greeting â€” forwarding is working.</li>
+            <li>If you hear the AI greeting — forwarding is working.</li>
             <li>
-              If your business phone rings normally â€” forwarding isn't set up
+              If your business phone rings normally — forwarding isn't set up
               correctly. Try the carrier steps again or contact your carrier.
             </li>
           </ol>

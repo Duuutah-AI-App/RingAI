@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { TrendingUp } from "lucide-react";
 import { useAppSession } from "@/context/AppSessionContext";
 import { isProPlan } from "@/lib/plan";
@@ -28,9 +29,9 @@ const AILearningPage = () => {
             <p className="text-sm text-ink-soft mb-4">
               Auto-learn menu aliases and get AI improvement suggestions
             </p>
-            <a href="/dashboard/billing" className="text-sm text-coral hover:underline font-medium">
+            <Link to="/dashboard/billing" className="text-sm text-coral hover:underline font-medium">
               Upgrade to Pro →
-            </a>
+            </Link>
           </div>
         </div>
       )}

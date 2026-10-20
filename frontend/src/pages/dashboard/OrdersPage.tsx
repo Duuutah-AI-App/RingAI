@@ -287,8 +287,8 @@ const OrdersPage = () => {
 
       {/* Orders table */}
       <div className="dash-card p-0 overflow-hidden">
-        {/* Table header */}
-        <div className="grid grid-cols-12 gap-4 px-5 py-3 bg-[#FBF4EC] border-b border-line text-xs font-semibold text-ink-soft">
+        {/* Table header (md+; phones get stacked cards below) */}
+        <div className="hidden md:grid grid-cols-12 gap-4 px-5 py-3 bg-[#FBF4EC] border-b border-line text-xs font-semibold text-ink-soft">
           <div className="col-span-2">Order #</div>
           <div className="col-span-2">Customer</div>
           <div className="col-span-2">Phone</div>
@@ -314,6 +314,27 @@ const OrdersPage = () => {
                 .join(", ");
               const extra = items.length > 2 ? ` +${items.length - 2} more` : "";
               const isDelivery = order.order_json?.order_type?.startsWith("delivery");
+              const dispatchFailed = order.order_json?.state === "DISPATCH_FAILED";
+              const failedChip = dispatchFailed && (
+                <span
+                  className="chip bg-red-500/10 text-red-600 text-[10px] mt-1 block w-fit"
+                  title={order.order_json?.dispatch_failure_reason || "POS dispatch failed"}
+                >
+                  Failed — enter manually
+                </span>
+              );
+              const typeChip = (
+                <span className={`chip ${isDelivery ? "bg-blue-500/10 text-blue-600" : "b-success"}`}>
+                  {orderBaseLabel(order.order_json?.order_type)}
+                </span>
+              );
+              const reservationNote = order.order_json?.order_type?.includes("reservation") &&
+                order.order_json?.order_type !== "reservation" && (
+                  <span className="text-[10px] leading-tight text-coral font-medium">
+                    + Reservation
+                  </span>
+                );
+              const total = `$${((order.order_total || 0) / 100).toFixed(2)}`;
 
               return (
                 <motion.div
@@ -321,53 +342,72 @@ const OrdersPage = () => {
                   initial={{ opacity: 0, y: 6 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: i * 0.03 }}
-                  className="grid grid-cols-12 gap-4 px-5 py-4 items-center hover:bg-[#FBF4EC] transition-colors cursor-pointer text-sm"
+                  className="px-4 py-4 md:px-5 hover:bg-[#FBF4EC] transition-colors cursor-pointer text-sm"
                   onClick={() => {
                     setSelectedOrder(order);
                     setDrawerOpen(true);
                   }}
                 >
-                  <div className="col-span-2">
-                    <span className="chip b-coral font-mono">{getOrderNumber(order)}</span>
-                    {order.order_json?.state === "DISPATCH_FAILED" && (
-                      <span
-                        className="chip bg-red-500/10 text-red-600 text-[10px] mt-1 block w-fit"
-                        title={order.order_json?.dispatch_failure_reason || "POS dispatch failed"}
-                      >
-                        Failed — enter manually
+                  {/* Phone layout: stacked card */}
+                  <div className="md:hidden space-y-2" data-testid="order-card">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <span className="chip b-coral font-mono">{getOrderNumber(order)}</span>
+                        {failedChip}
+                      </div>
+                      <span className="font-semibold text-[#2f7d5e] shrink-0" data-testid="order-total">{total}</span>
+                    </div>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <User className="w-3.5 h-3.5 text-ink-soft shrink-0" />
+                      <span className="truncate font-medium">{name}</span>
+                      <span className="shrink-0">{typeChip}</span>
+                      {reservationNote}
+                    </div>
+                    {itemSummary && (
+                      <p className="text-xs text-ink-soft line-clamp-2">
+                        {itemSummary}
+                        {extra && <span className="text-coral font-medium">{extra}</span>}
+                      </p>
+                    )}
+                    <div className="flex items-center justify-between gap-3 text-xs text-ink-soft">
+                      <span className="flex items-center gap-1.5 min-w-0">
+                        <Phone className="w-3.5 h-3.5 shrink-0" />
+                        <span className="truncate">{formatPhone(order.caller_number)}</span>
                       </span>
-                    )}
+                      <span className="shrink-0" data-testid="order-date">{formatDate(order.started_at)}</span>
+                    </div>
                   </div>
-                  <div className="col-span-2 flex items-center gap-1.5 min-w-0">
-                    <User className="w-3.5 h-3.5 text-ink-soft shrink-0" />
-                    <span className="truncate font-medium">{name}</span>
-                  </div>
-                  <div className="col-span-2 flex items-center gap-1.5 text-ink-soft">
-                    <Phone className="w-3.5 h-3.5 shrink-0" />
-                    <span className="text-xs">{formatPhone(order.caller_number)}</span>
-                  </div>
-                  <div className="col-span-2 text-ink-soft truncate text-xs">
-                    {itemSummary}
-                    {extra && (
-                      <span className="text-coral font-medium">{extra}</span>
-                    )}
-                  </div>
-                  <div className="col-span-1 flex flex-col items-start gap-0.5">
-                    <span className={`chip ${isDelivery ? "bg-blue-500/10 text-blue-600" : "b-success"}`}>
-                      {orderBaseLabel(order.order_json?.order_type)}
-                    </span>
-                    {order.order_json?.order_type?.includes("reservation") &&
-                      order.order_json?.order_type !== "reservation" && (
-                        <span className="text-[10px] leading-tight text-coral font-medium">
-                          + Reservation
-                        </span>
+
+                  {/* md+ layout: table row */}
+                  <div className="hidden md:grid grid-cols-12 gap-4 items-center">
+                    <div className="col-span-2">
+                      <span className="chip b-coral font-mono">{getOrderNumber(order)}</span>
+                      {failedChip}
+                    </div>
+                    <div className="col-span-2 flex items-center gap-1.5 min-w-0">
+                      <User className="w-3.5 h-3.5 text-ink-soft shrink-0" />
+                      <span className="truncate font-medium">{name}</span>
+                    </div>
+                    <div className="col-span-2 flex items-center gap-1.5 text-ink-soft">
+                      <Phone className="w-3.5 h-3.5 shrink-0" />
+                      <span className="text-xs">{formatPhone(order.caller_number)}</span>
+                    </div>
+                    <div className="col-span-2 text-ink-soft truncate text-xs">
+                      {itemSummary}
+                      {extra && (
+                        <span className="text-coral font-medium">{extra}</span>
                       )}
-                  </div>
-                  <div className="col-span-1 font-semibold text-[#2f7d5e]">
-                    ${((order.order_total || 0) / 100).toFixed(2)}
-                  </div>
-                  <div className="col-span-2 text-xs text-ink-soft whitespace-nowrap">
-                    {formatDate(order.started_at)}
+                    </div>
+                    <div className="col-span-1 flex flex-col items-start gap-0.5">
+                      {typeChip}
+                      {reservationNote}
+                    </div>
+                    <div className="col-span-1 font-semibold text-[#2f7d5e]">
+                      {total}
+                    </div>
+                    <div className="col-span-2 text-xs text-ink-soft whitespace-nowrap">
+                      {formatDate(order.started_at)}
+                    </div>
                   </div>
                 </motion.div>
               );

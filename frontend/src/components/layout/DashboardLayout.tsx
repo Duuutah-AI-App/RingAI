@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import {
   Popover,
   PopoverContent,
@@ -176,7 +177,13 @@ const DashboardLayout = () => {
 
   const isActive = (path: string) => location.pathname === path || (path !== "/dashboard" && location.pathname.startsWith(path));
 
-  const sidebar = (
+  // Close the mobile drawer whenever the route changes (link taps, back button).
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [location.pathname]);
+
+  // The mobile drawer always shows labels, even if the desktop rail is collapsed.
+  const renderSidebar = (collapsed: boolean) => (
     <div className="flex flex-col h-full">
       <div className="h-16 flex items-center px-4 border-b border-border/50">
         <Link to="/dashboard" className="flex items-center gap-2.5 overflow-hidden">
@@ -222,22 +229,24 @@ const DashboardLayout = () => {
   const currentLabel = navItems.find((n) => isActive(n.path))?.label || "Dashboard";
 
   return (
-    <div className="dash-surface h-screen overflow-hidden flex">
+    <div className="dash-surface h-screen supports-[height:100dvh]:h-dvh overflow-hidden flex">
       <aside className={`${collapsed ? "w-[72px]" : "w-60"} hidden lg:flex border-r border-border/50 bg-card flex-col transition-all duration-300 shrink-0`}>
-        {sidebar}
+        {renderSidebar(collapsed)}
       </aside>
 
-      {mobileOpen && (
-        <div className="fixed inset-0 z-40 lg:hidden">
-          <div className="absolute inset-0 bg-black/30" onClick={() => setMobileOpen(false)} />
-          <aside className="relative w-64 h-full bg-card border-r border-border/50">{sidebar}</aside>
-        </div>
-      )}
+      {/* Mobile drawer: Radix Sheet portals to <body>, so it overlays the page and
+          handles the backdrop, Escape, focus trap and background scroll lock. */}
+      <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
+        <SheetContent side="left" className="w-64 p-0 gap-0 bg-card border-border/50 lg:hidden" aria-describedby={undefined}>
+          <SheetTitle className="sr-only">Navigation</SheetTitle>
+          {renderSidebar(false)}
+        </SheetContent>
+      </Sheet>
 
       <div className="flex-1 flex flex-col min-w-0">
         <header className="h-16 border-b border-border/50 bg-card/80 backdrop-blur-xl flex items-center justify-between px-4 lg:px-6">
           <div className="flex items-center gap-3 min-w-0">
-            <Button variant="ghost" size="icon" className="rounded-xl lg:hidden" onClick={() => setMobileOpen(true)}>
+            <Button variant="ghost" size="icon" className="rounded-xl lg:hidden shrink-0" aria-label="Open navigation" onClick={() => setMobileOpen(true)}>
               <Menu className="w-5 h-5" />
             </Button>
             <div className="min-w-0">
@@ -281,7 +290,7 @@ const DashboardLayout = () => {
               </PopoverTrigger>
               <PopoverContent 
                 align="end" 
-                className="w-80 p-0"
+                className="w-[min(20rem,calc(100vw-2rem))] p-0"
                 data-testid="notifications-panel"
               >
                 <div className="flex items-center justify-between p-4 border-b">
@@ -353,11 +362,15 @@ const DashboardLayout = () => {
                     </div>
                   )}
                 </ScrollArea>
-                <div className="p-2 border-t">
-                  <Button variant="ghost" className="w-full text-xs" size="sm">
-                    View all notifications
-                  </Button>
-                </div>
+                {/* Notifications are live, in-memory only (there is no history page
+                    yet), so the footer offers the one real action: clearing them. */}
+                {notifications.length > 0 && (
+                  <div className="p-2 border-t">
+                    <Button variant="ghost" className="w-full text-xs" size="sm" onClick={() => setNotifications([])}>
+                      Clear all notifications
+                    </Button>
+                  </div>
+                )}
               </PopoverContent>
             </Popover>
             

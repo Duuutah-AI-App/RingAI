@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import axios from "axios";
 import { useAppSession } from "@/context/AppSessionContext";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -182,9 +182,9 @@ export const ReservationsPage = () => {
           <p className="text-sm text-ink-soft mb-4">
             Let your AI handle table reservations, manage availability, and book parties automatically.
           </p>
-          <a href="/dashboard/billing" className="inline-flex items-center justify-center rounded-xl bg-coral text-white px-6 py-2 text-sm font-medium hover:bg-coral-deep">
+          <Link to="/dashboard/billing" className="inline-flex items-center justify-center rounded-xl bg-coral text-white px-6 py-2 text-sm font-medium hover:bg-coral-deep">
             Upgrade to Pro
-          </a>
+          </Link>
         </div>
       </div>
     );

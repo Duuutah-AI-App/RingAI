@@ -260,32 +260,36 @@ const CallsPage = () => {
         </div>
 
         {/* Date Filters */}
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-2">
-            <Calendar className="w-4 h-4 text-ink-soft" />
-            <span className="text-sm text-ink-soft">From:</span>
+        {/* Labels sit above the inputs and the inputs keep a fixed height, so an
+            empty date field (which iOS Safari renders with no placeholder text)
+            still reads as a field. Two equal columns on phones. */}
+        <div className="grid grid-cols-2 gap-3 sm:flex sm:flex-wrap sm:items-end">
+          <label className="flex flex-col gap-1 min-w-0 text-xs font-medium text-ink-soft">
+            <span className="flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5" />From</span>
             <Input
               type="date"
+              aria-label="From date"
               value={dateFrom}
               onChange={(e) => { setDateFrom(e.target.value); setPage(1); }}
-              className="w-40 h-9 rounded-lg border-line bg-[#FFFDF9]"
+              className="w-full sm:w-40 h-10 min-h-10 rounded-lg border-line bg-[#FFFDF9] text-sm text-ink"
               data-testid="date-from-input"
             />
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-ink-soft">To:</span>
+          </label>
+          <label className="flex flex-col gap-1 min-w-0 text-xs font-medium text-ink-soft">
+            <span className="flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5" />To</span>
             <Input
               type="date"
+              aria-label="To date"
               value={dateTo}
               onChange={(e) => { setDateTo(e.target.value); setPage(1); }}
-              className="w-40 h-9 rounded-lg border-line bg-[#FFFDF9]"
+              className="w-full sm:w-40 h-10 min-h-10 rounded-lg border-line bg-[#FFFDF9] text-sm text-ink"
               data-testid="date-to-input"
             />
-          </div>
+          </label>
           {(dateFrom || dateTo) && (
             <button
               onClick={clearDateFilters}
-              className="text-xs font-semibold text-coral hover:text-coral-deep"
+              className="col-span-2 justify-self-start sm:h-10 text-xs font-semibold text-coral hover:text-coral-deep"
             >
               Clear dates
             </button>

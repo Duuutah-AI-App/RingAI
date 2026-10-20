@@ -108,6 +108,13 @@ export const SAMPLE_ANALYTICS_SUMMARY = {
   avg_quality_score: 88,
   ai_containment_rate: 81,
   escalated_calls: 4,
+  // Per-period counterparts (all calls in this fixture fall within the week).
+  avg_quality_this_week: 88,
+  avg_quality_this_month: 88,
+  ai_containment_rate_this_week: 81,
+  ai_containment_rate_this_month: 81,
+  escalated_this_week: 4,
+  escalated_this_month: 4,
   recent_calls: [SAMPLE_CALL],
   top_items: [{ name: "Margherita Pizza", count: 12 }],
   daily_call_data: [
