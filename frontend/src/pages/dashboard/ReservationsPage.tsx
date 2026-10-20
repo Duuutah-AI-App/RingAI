@@ -192,8 +192,10 @@ export const ReservationsPage = () => {
 
   return (
     <div className="dash p-6 space-y-6" data-testid="reservations-page">
-      <div className="flex items-center justify-between">
-        <div>
+      {/* Phones: title block full width, button on its own row below. sm+: the
+          original side-by-side header. */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
           <p className="eyebrow mb-2">Bookings</p>
           <h1 className="text-2xl font-display font-bold">Reservations</h1>
           <p className="text-ink-soft">
@@ -202,7 +204,7 @@ export const ReservationsPage = () => {
         </div>
         <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
           <DialogTrigger asChild>
-            <Button data-testid="create-reservation-btn" className="bg-coral hover:bg-coral-deep text-white">
+            <Button data-testid="create-reservation-btn" className="w-full sm:w-auto shrink-0 bg-coral hover:bg-coral-deep text-white">
               <Plus className="w-4 h-4 mr-2" /> New Reservation
             </Button>
           </DialogTrigger>

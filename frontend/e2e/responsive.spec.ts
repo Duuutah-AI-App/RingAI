@@ -133,3 +133,62 @@ test("upgrade links navigate without a full page reload", async ({ page }) => {
   await expect(page).toHaveURL(/\/dashboard\/billing$/);
   expect(await page.evaluate(() => (window as unknown as { __spaMarker?: boolean }).__spaMarker)).toBe(true);
 });
+
+// Pro-only pages: the default mock is a Starter account (like staging), which
+// shows upgrade cards instead of these sections.
+test.describe("Pro plan pages", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.unrouteAll({ behavior: "ignoreErrors" });
+    await mockApi(page, { plan: "PRO" });
+  });
+
+  test("reservations header gives the title full width and the button its own row", async ({ page }) => {
+    await gotoDashboard(page, "/dashboard/reservations", "Reservations");
+    await maybeScreenshot(page, "pro-reservations");
+    expect(await horizontalOverflow(page)).toBeLessThanOrEqual(1);
+
+    const main = (await page.locator("main").boundingBox())!;
+    const title = (await page.getByRole("heading", { level: 1, name: "Reservations" }).boundingBox())!;
+    const description = (await page.getByText(/^Manage table reservations for/).boundingBox())!;
+    const button = page.getByTestId("create-reservation-btn");
+    const btn = (await button.boundingBox())!;
+
+    // Description is no longer squeezed into a narrow column beside the button.
+    expect(description.width).toBeGreaterThan(main.width * 0.6);
+    // Button sits below the heading block, fully on screen.
+    expect(btn.y).toBeGreaterThanOrEqual(description.y + description.height - 1);
+    expect(btn.x).toBeGreaterThanOrEqual(main.x);
+    expect(btn.x + btn.width).toBeLessThanOrEqual(main.x + main.width + 0.5);
+    expect(title.x).toBeLessThan(btn.x + 1);
+
+    // Still opens the existing create dialog.
+    await button.click();
+    await expect(page.getByRole("dialog", { name: "Create Reservation" })).toBeVisible();
+  });
+
+  test("AI Learning review actions stay inside each review card", async ({ page }) => {
+    await gotoDashboard(page, "/dashboard/learning", "AI Learning");
+    await maybeScreenshot(page, "pro-ai-learning");
+    expect(await horizontalOverflow(page)).toBeLessThanOrEqual(1);
+
+    const cards = page.locator('[data-testid^="flagged-call-"]');
+    await expect(cards).toHaveCount(3);
+    for (const card of await cards.all()) {
+      const box = (await card.boundingBox())!;
+      for (const name of ["AI was correct", "AI made a mistake"]) {
+        const b = (await card.getByRole("button", { name }).boundingBox())!;
+        expect(b.x).toBeGreaterThanOrEqual(box.x);
+        expect(b.x + b.width).toBeLessThanOrEqual(box.x + box.width + 0.5);
+      }
+      // Score and date remain visible; long summaries truncate instead of overflowing.
+      await expect(card.getByText(/^Score: \d+$/)).toBeVisible();
+    }
+
+    // Reject still calls the same review endpoint with the same payload.
+    const req = page.waitForRequest(
+      (r) => r.method() === "POST" && r.url().endsWith("/api/learning/flagged-calls/flag_0/review"),
+    );
+    await page.getByTestId("flagged-call-flag_0").getByRole("button", { name: "AI made a mistake" }).click();
+    expect((await req).postDataJSON()).toEqual({ action: "incorrect" });
+  });
+});

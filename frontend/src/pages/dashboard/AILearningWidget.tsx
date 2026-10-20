@@ -190,11 +190,13 @@ export const AILearningWidget = () => {
             {flaggedCalls.slice(0, 3).map((call) => (
               <div
                 key={call.call_id}
-                className="p-3 rounded-lg border bg-card flex items-center justify-between"
+                className="p-3 rounded-lg border bg-card flex items-center justify-between gap-2"
                 data-testid={`flagged-call-${call.call_id}`}
               >
-                <div>
-                  <div className="flex items-center gap-2">
+                {/* min-w-0 lets this column shrink (and the summary truncate) so
+                    the action buttons stay inside the card on narrow phones. */}
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                     <Badge variant="secondary" className="bg-orange-100 text-orange-700">
                       Score: {call.quality_score}
                     </Badge>
@@ -208,13 +210,14 @@ export const AILearningWidget = () => {
                     </p>
                   )}
                 </div>
-                <div className="flex gap-1">
+                <div className="flex gap-1 shrink-0">
                   <Button
                     size="sm"
                     variant="ghost"
                     className="text-green-600 hover:text-green-700 hover:bg-green-50"
                     onClick={() => handleReviewCall(call.call_id, "correct")}
                     title="AI was correct"
+                    aria-label="AI was correct"
                   >
                     <CheckCircle className="w-4 h-4" />
                   </Button>
@@ -224,6 +227,7 @@ export const AILearningWidget = () => {
                     className="text-red-600 hover:text-red-700 hover:bg-red-50"
                     onClick={() => handleReviewCall(call.call_id, "incorrect")}
                     title="AI made a mistake"
+                    aria-label="AI made a mistake"
                   >
                     <XCircle className="w-4 h-4" />
                   </Button>

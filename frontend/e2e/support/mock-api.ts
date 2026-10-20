@@ -117,14 +117,53 @@ const GET_ROUTES: Array<[RegExp, Handler]> = [
   [/^\/api\/calls\/[^/]+$/, (url) => CALLS.find((c) => url.pathname.endsWith(c.id)) ?? CALLS[0]],
 ];
 
+// Pro-plan overrides (checked before GET_ROUTES): unlocks Reservations and AI
+// Learning, with review data shaped like the production Pro account.
+const PRO_RESTAURANT = { ...RESTAURANT, plan: "PRO" };
+const FLAGGED_CALLS = [
+  { score: 35, issue: "AI failed to map 'Bangalore se' to any menu item and asked the caller to repeat twice" },
+  { score: 65, issue: "AI misheard 'chicken chilly' as 'Chicken Pakora' and confirmed the wrong item" },
+  { score: 40, issue: "AI accepted items not present on the menu" },
+].map(({ score, issue }, i) => ({
+  call_id: `flag_${i}`,
+  quality_score: score,
+  issues: [issue],
+  order_accuracy: "low",
+  flagged_at: new Date(Date.UTC(2026, 9, 19 - i)).toISOString(),
+  reviewed: false,
+}));
+const PRO_ROUTES: Array<[RegExp, Handler]> = [
+  [/^\/api\/me\/bootstrap$/, () => ({
+    user: { id: "user_e2e", email: "owner@e2e.test" },
+    memberships: [{ restaurant_id: PRO_RESTAURANT.id, role: "owner" }],
+    restaurants: [PRO_RESTAURANT],
+    active_restaurant: PRO_RESTAURANT,
+    onboarding_complete: true,
+  })],
+  [/^\/api\/restaurants\/[^/]+$/, () => PRO_RESTAURANT],
+  [/^\/api\/restaurants\/[^/]+\/plan-features$/, () => ({ plan: "PRO", features: [] })],
+  [/^\/api\/restaurants\/[^/]+\/learning\/stats$/, () => ({
+    total_calls_processed: 255, aliases_learned: 7, calls_flagged: 29, last_processed: null,
+  })],
+  [/^\/api\/restaurants\/[^/]+\/learning\/flagged-calls$/, () => ({ flagged_calls: FLAGGED_CALLS })],
+  [/^\/api\/restaurants\/[^/]+\/learning\/aliases$/, () => ({
+    aliases: [{ alias_term: "chicken biryani", target_item: "Chicken Dum Biryanis", occurrence_count: 4, applied_at: "2026-10-01T00:00:00Z" }],
+  })],
+  [/^\/api\/restaurants\/[^/]+\/learning\/suggestions$/, () => ({ pending_aliases: [], suggested_rules: [] })],
+  [/^\/api\/restaurants\/[^/]+\/reservations$/, () => ({ reservations: [] })],
+  [/^\/api\/restaurants\/[^/]+\/reservation-slots$/, () => ({ slots: [] })],
+];
+
 /** Fulfil every backend request with deterministic fixtures. Unknown GETs get
- *  an empty object; writes succeed with { ok: true }. */
-export async function mockApi(page: Page) {
+ *  an empty object; writes succeed with { ok: true }. `plan: "PRO"` unlocks the
+ *  Pro-only pages (Reservations, AI Learning). */
+export async function mockApi(page: Page, { plan = "STARTER" }: { plan?: "STARTER" | "PRO" } = {}) {
+  const routes = plan === "PRO" ? [...PRO_ROUTES, ...GET_ROUTES] : GET_ROUTES;
   await page.route(`${E2E_API_ORIGIN}/**`, async (route) => {
     const url = new URL(route.request().url());
     let body: unknown = { ok: true };
     if (route.request().method() === "GET") {
-      const match = GET_ROUTES.find(([re]) => re.test(url.pathname));
+      const match = routes.find(([re]) => re.test(url.pathname));
       body = match ? match[1](url, route) : {};
     }
     await route.fulfill({ json: body });
