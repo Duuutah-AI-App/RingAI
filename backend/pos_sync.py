@@ -6,7 +6,7 @@ Uses pos_item_id as the stable key to avoid duplicates.
 import logging
 import uuid
 from datetime import datetime, timezone
-from typing import Dict, Any
+from typing import Dict, Any, List, Optional
 
 import httpx
 
@@ -190,6 +190,39 @@ def _square_oauth_base() -> str:
     import os
     square_env = os.environ.get("SQUARE_ENVIRONMENT", "sandbox")
     return "https://connect.squareupsandbox.com" if square_env == "sandbox" else "https://connect.squareup.com"
+
+
+def square_environment() -> str:
+    """The environment this deployment's Square OAuth app runs in: "sandbox" or
+    "production". Same rule as _square_oauth_base: anything other than exactly
+    "sandbox" is production. Stored as the restaurant's pos_env on connect so
+    dispatch talks to the environment the token was issued in."""
+    import os
+    return "sandbox" if os.environ.get("SQUARE_ENVIRONMENT", "sandbox") == "sandbox" else "production"
+
+
+async def fetch_square_active_locations(access_token: str) -> Optional[List[Dict[str, str]]]:
+    """The merchant's ACTIVE locations as [{"id", "name"}], via GET /v2/locations
+    (requires the MERCHANT_PROFILE_READ scope). Returns None on any failure so
+    the OAuth callback can still finish connecting."""
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.get(
+                f"{_square_oauth_base()}/v2/locations",
+                headers={"Authorization": f"Bearer {access_token}", "Square-Version": "2024-01-18"},
+            )
+        if resp.status_code != 200:
+            logger.warning(f"[Square OAuth] location lookup failed: {resp.status_code}")
+            return None
+        locations = resp.json().get("locations") or []
+    except Exception as e:
+        logger.warning(f"[Square OAuth] location lookup error: {type(e).__name__}")
+        return None
+    return [
+        {"id": loc["id"], "name": loc.get("name", "")}
+        for loc in locations
+        if loc.get("status") == "ACTIVE" and loc.get("id")
+    ]
 
 
 async def refresh_square_token(refresh_token: str) -> Dict[str, Any]:

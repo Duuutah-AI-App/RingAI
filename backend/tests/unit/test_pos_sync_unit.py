@@ -314,3 +314,89 @@ async def test_sync_returns_error_for_unknown_pos_type(async_db):
     )
     assert result["success"] is False
     assert "No POS" in result["error"]
+
+
+# ---------------------------------------------------------------------------
+# Square OAuth location lookup — square_environment / fetch_square_active_locations
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize(
+    "env_value, expected",
+    [("sandbox", "sandbox"), ("production", "production"), (None, "sandbox")],
+)
+def test_square_environment_maps_env(monkeypatch, env_value, expected):
+    from pos_sync import square_environment
+
+    if env_value is None:
+        monkeypatch.delenv("SQUARE_ENVIRONMENT", raising=False)
+    else:
+        monkeypatch.setenv("SQUARE_ENVIRONMENT", env_value)
+    assert square_environment() == expected
+
+
+@pytest.mark.parametrize(
+    "env_value, host",
+    [("sandbox", "connect.squareupsandbox.com"), ("production", "connect.squareup.com")],
+)
+async def test_fetch_square_locations_uses_env_host_and_token(monkeypatch, env_value, host):
+    from pos_sync import fetch_square_active_locations
+
+    monkeypatch.setenv("SQUARE_ENVIRONMENT", env_value)
+    captured = {}
+
+    async def fake_get(self, url, **kwargs):
+        captured["url"] = url
+        captured["auth"] = kwargs["headers"]["Authorization"]
+        return httpx.Response(200, json={"locations": [{"id": "L1", "name": "Main", "status": "ACTIVE"}]})
+
+    monkeypatch.setattr(httpx.AsyncClient, "get", fake_get)
+    out = await fetch_square_active_locations("tok_123")
+    assert out == [{"id": "L1", "name": "Main"}]
+    assert captured["url"] == f"https://{host}/v2/locations"
+    assert captured["auth"] == "Bearer tok_123"
+
+
+async def test_fetch_square_locations_keeps_only_active(monkeypatch):
+    from pos_sync import fetch_square_active_locations
+
+    async def fake_get(self, url, **kwargs):
+        return httpx.Response(200, json={"locations": [
+            {"id": "L1", "name": "Downtown", "status": "ACTIVE"},
+            {"id": "L2", "name": "Closed store", "status": "INACTIVE"},
+            {"id": "L3", "name": "Airport", "status": "ACTIVE"},
+        ]})
+
+    monkeypatch.setattr(httpx.AsyncClient, "get", fake_get)
+    out = await fetch_square_active_locations("tok")
+    assert [loc["id"] for loc in out] == ["L1", "L3"]
+
+
+async def test_fetch_square_locations_no_locations_returns_empty_list(monkeypatch):
+    from pos_sync import fetch_square_active_locations
+
+    async def fake_get(self, url, **kwargs):
+        return httpx.Response(200, json={})
+
+    monkeypatch.setattr(httpx.AsyncClient, "get", fake_get)
+    assert await fetch_square_active_locations("tok") == []
+
+
+@pytest.mark.parametrize("status_code", [401, 403, 500])
+async def test_fetch_square_locations_http_error_returns_none(monkeypatch, status_code):
+    from pos_sync import fetch_square_active_locations
+
+    async def fake_get(self, url, **kwargs):
+        return httpx.Response(status_code, json={"errors": [{"code": "INSUFFICIENT_SCOPES"}]})
+
+    monkeypatch.setattr(httpx.AsyncClient, "get", fake_get)
+    assert await fetch_square_active_locations("tok") is None
+
+
+async def test_fetch_square_locations_network_error_returns_none(monkeypatch):
+    from pos_sync import fetch_square_active_locations
+
+    async def boom(self, url, **kwargs):
+        raise httpx.ConnectError("down")
+
+    monkeypatch.setattr(httpx.AsyncClient, "get", boom)
+    assert await fetch_square_active_locations("tok") is None

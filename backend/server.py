@@ -5864,6 +5864,16 @@ async def stripe_webhook(request: Request):
     return JSONResponse({"received": True})
 
 
+# Least privilege: one scope per Square API the app calls. Scopes are fixed when
+# the owner approves, so restaurants connected before a change must reconnect.
+SQUARE_OAUTH_SCOPES = (
+    "ITEMS_READ",             # POST /v2/catalog/list — menu sync
+    "ORDERS_WRITE",           # POST /v2/orders — dispatch + parked carts
+    "ORDERS_READ",            # POST /v2/orders/search — kitchen queue depth
+    "MERCHANT_PROFILE_READ",  # GET /v2/locations — location lookup on connect
+)
+
+
 @api_router.get("/integrations/square/connect")
 async def square_connect(restaurant_id: str = Query(...), user: Dict[str, Any] = Depends(get_current_user)):
     await ensure_restaurant_access(restaurant_id, user)
@@ -5880,7 +5890,7 @@ async def square_connect(restaurant_id: str = Query(...), user: Dict[str, Any] =
     square_base = "https://connect.squareupsandbox.com" if square_env == "sandbox" else "https://connect.squareup.com"
     connect_url = (
         f"{square_base}/oauth2/authorize"
-        f"?client_id={application_id}&scope=ITEMS_READ+ORDERS_READ+PAYMENTS_READ"
+        f"?client_id={application_id}&scope={'+'.join(SQUARE_OAUTH_SCOPES)}"
         f"&session=false&state={state}&redirect_uri={redirect_uri}"
     )
     return {"connect_url": connect_url}
@@ -5955,6 +5965,40 @@ async def square_callback(code: Optional[str] = None, state: Optional[str] = Non
     refresh_token = token_data.get("refresh_token", "")
     expires_at = token_data.get("expires_at", "")
 
+    # Orders are created against one Square location (square_location_id), which
+    # the token exchange doesn't return. Duuutah maps one restaurant to one
+    # location, so save it only when the merchant has exactly one active
+    # location; with several, never guess — the owner picks one. pos_env pins
+    # dispatch to the environment this token was issued in.
+    from pos_sync import fetch_square_active_locations, square_environment
+    locations = await fetch_square_active_locations(access_token)
+    restaurant_set = {
+        "square_connected": True,
+        "pos_type": "square",
+        "pos_env": square_environment(),
+        "square_access_token": encrypt_value(access_token),
+        "square_refresh_token": encrypt_value(refresh_token),
+        "square_token_expires_at": expires_at,
+    }
+    restaurant_unset = {}
+    if locations is None:
+        location_status = "lookup_failed"
+    elif len(locations) == 1:
+        location_status = "saved"
+        restaurant_set["square_location_id"] = encrypt_value(locations[0]["id"])
+    elif not locations:
+        location_status = "none"
+    else:
+        location_status = "select_required"
+    if location_status != "saved":
+        # Drop any location saved for a previous connection: it may belong to
+        # another merchant. Dispatch then fails visibly until one is chosen.
+        restaurant_unset["square_location_id"] = ""
+        logger.warning(
+            f"[Square OAuth] {restaurant_id}: no location saved ({location_status}, "
+            f"{len(locations or [])} active)"
+        )
+
     await db.integrations.update_one(
         {"provider": "square", "restaurant_id": restaurant_id},
         {"$set": {
@@ -5962,22 +6006,21 @@ async def square_callback(code: Optional[str] = None, state: Optional[str] = Non
             "restaurant_id": restaurant_id,
             "status": "connected",
             "merchant_id": merchant_id,
+            "location_status": location_status,
+            "active_location_count": len(locations) if locations is not None else None,
             "updated_at": datetime.now(timezone.utc).isoformat(),
         }},
         upsert=True,
     )
+    restaurant_update = {"$set": restaurant_set}
+    if restaurant_unset:
+        restaurant_update["$unset"] = restaurant_unset
     for _coll in [db.restaurants, db.clinics, db.salons, db.home_services, db.legal]:
-        await _coll.update_one(
-            {"id": restaurant_id},
-            {"$set": {
-                "square_connected": True,
-                "pos_type": "square",
-                "square_access_token": encrypt_value(access_token),
-                "square_refresh_token": encrypt_value(refresh_token),
-                "square_token_expires_at": expires_at,
-            }},
-        )
-    return RedirectResponse(url=f"{landing}?status=connected&merchant_id={merchant_id}", status_code=303)
+        await _coll.update_one({"id": restaurant_id}, restaurant_update)
+    return RedirectResponse(
+        url=f"{landing}?status=connected&merchant_id={merchant_id}&location={location_status}",
+        status_code=303,
+    )
 
 
 # ─────────────────────────────────────────────────────────────

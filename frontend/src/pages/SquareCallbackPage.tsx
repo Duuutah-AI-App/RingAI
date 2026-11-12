@@ -18,12 +18,25 @@ const REASON_MESSAGES: Record<string, string> = {
     "We couldn't finish connecting your Square account. Please try again.",
 };
 
+// `location` reports whether the backend could save the Square location that
+// orders are sent to. Anything other than "saved" means orders will fail until
+// a location is set, so the owner is told what to do.
+const LOCATION_NOTICES: Record<string, string> = {
+  select_required:
+    "Your Square account has more than one location, so we didn't pick one. Orders won't reach Square until you choose this restaurant's location: in Integrations, open \"Advanced: enter credentials manually\", choose Square and the same environment, leave Access Token empty, and paste the Location ID from your Square Dashboard (Account & Settings → Locations).",
+  none:
+    "Your Square account has no active location, so orders can't be sent to Square yet. Activate a location in Square, then connect again.",
+  lookup_failed:
+    "We couldn't read your Square locations, so orders can't be sent to Square yet. Please connect again from Integrations.",
+};
+
 const SquareCallbackPage = () => {
   const [params] = useSearchParams();
 
   const status = params.get("status");
   const merchantId = params.get("merchant_id");
   const reason = params.get("reason");
+  const locationNotice = LOCATION_NOTICES[params.get("location") ?? ""];
 
   const connected = status === "connected";
   const errorMessage =
@@ -42,6 +55,14 @@ const SquareCallbackPage = () => {
             {merchantId && (
               <p className="text-ink-soft text-sm">
                 Merchant ID: <span className="font-mono">{merchantId}</span>
+              </p>
+            )}
+            {locationNotice && (
+              <p
+                role="alert"
+                className="text-sm text-left rounded-lg border border-honey/40 bg-honey/10 px-3 py-2 text-ink"
+              >
+                {locationNotice}
               </p>
             )}
             <Link

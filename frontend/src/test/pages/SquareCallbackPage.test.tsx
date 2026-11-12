@@ -36,6 +36,37 @@ describe("SquareCallbackPage", () => {
     ).toHaveAttribute("href", "/dashboard/integrations");
   });
 
+  it("shows no location notice when the location was saved", () => {
+    renderWithProviders(<SquareCallbackPage />, {
+      initialEntries: [`${CALLBACK}?status=connected&merchant_id=ABC123&location=saved`],
+    });
+
+    expect(screen.getByText(/Square connected/i)).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("tells a multi-location owner to choose a location instead of guessing", () => {
+    renderWithProviders(<SquareCallbackPage />, {
+      initialEntries: [`${CALLBACK}?status=connected&merchant_id=ABC123&location=select_required`],
+    });
+
+    expect(screen.getByText(/Square connected/i)).toBeInTheDocument();
+    const notice = screen.getByRole("alert");
+    expect(notice).toHaveTextContent(/more than one location/i);
+    expect(notice).toHaveTextContent(/Location ID/i);
+  });
+
+  it.each([
+    ["lookup_failed", /couldn't read your Square locations/i],
+    ["none", /no active location/i],
+  ])("warns that orders can't be sent when location=%s", (status, message) => {
+    renderWithProviders(<SquareCallbackPage />, {
+      initialEntries: [`${CALLBACK}?status=connected&merchant_id=ABC123&location=${status}`],
+    });
+
+    expect(screen.getByRole("alert")).toHaveTextContent(message);
+  });
+
   it("maps reason=invalid_state to the expired/invalid message", () => {
     renderWithProviders(<SquareCallbackPage />, {
       initialEntries: [`${CALLBACK}?status=error&reason=invalid_state`],

@@ -1399,3 +1399,208 @@ async def test_square_webhook_oauth_revoked_marks_integration_disconnected(
         {"provider": "square", "merchant_id": "MERCH_X"}, {"_id": 0}
     )
     assert integ["status"] == "disconnected"
+
+
+# ---------------------------------------------------------------------------
+# Square OAuth — scopes, location lookup on connect, and dispatch with the
+# credentials the callback saves (no manual Location ID).
+# ---------------------------------------------------------------------------
+
+_SQ_LOCATION = {"id": "L_MAIN", "name": "Main St"}
+
+
+def _square_env(monkeypatch, environment="sandbox"):
+    monkeypatch.setenv("SQUARE_APPLICATION_ID", "app_test")
+    monkeypatch.setenv("SQUARE_REDIRECT_URI", "https://example.test/callback")
+    monkeypatch.setenv("SQUARE_ENVIRONMENT", environment)
+
+
+async def _run_square_callback(client, db, monkeypatch, locations, environment="sandbox"):
+    """Connect + callback with a mocked token exchange and location lookup.
+    Returns (redirect URL, saved restaurant doc, integration doc)."""
+    _square_env(monkeypatch, environment)
+    connect_resp = client.get(
+        f"/api/integrations/square/connect?restaurant_id={TENANT_A_ID}",
+        headers={"Authorization": "Bearer tenant_a"},
+    )
+    state = _extract_state(connect_resp.json()["connect_url"])
+
+    import pos_sync
+
+    async def _fake_exchange(code, redirect_uri):
+        return {
+            "access_token": "sq_at_test",
+            "merchant_id": "M123",
+            "refresh_token": "sq_rt_test",
+            "expires_at": "2099-01-01T00:00:00Z",
+        }
+
+    seen_tokens = []
+
+    async def _fake_locations(access_token):
+        seen_tokens.append(access_token)
+        return locations
+
+    monkeypatch.setattr(pos_sync, "exchange_square_code", _fake_exchange)
+    monkeypatch.setattr(pos_sync, "fetch_square_active_locations", _fake_locations)
+
+    response = client.get(
+        f"/api/integrations/square/callback?code=AUTH&state={state}",
+        follow_redirects=False,
+    )
+    assert response.status_code == 303
+    # The lookup must use the freshly exchanged token.
+    assert seen_tokens == ["sq_at_test"]
+    saved = await db.restaurants.find_one({"id": TENANT_A_ID}, {"_id": 0})
+    integ = await db.integrations.find_one(
+        {"provider": "square", "restaurant_id": TENANT_A_ID}, {"_id": 0}
+    )
+    return response.headers["location"], saved, integ
+
+
+async def test_square_connect_requests_exactly_the_needed_scopes(
+    client, two_tenant_with_memberships, monkeypatch
+):
+    _square_env(monkeypatch)
+    response = client.get(
+        f"/api/integrations/square/connect?restaurant_id={TENANT_A_ID}",
+        headers={"Authorization": "Bearer tenant_a"},
+    )
+    scopes = parse_qs(urlparse(response.json()["connect_url"]).query)["scope"][0].split(" ")
+    # ORDERS_WRITE creates orders; MERCHANT_PROFILE_READ reads locations.
+    # PAYMENTS_READ is not used by any Square call and is no longer requested.
+    assert sorted(scopes) == sorted(
+        ["ITEMS_READ", "ORDERS_WRITE", "ORDERS_READ", "MERCHANT_PROFILE_READ"]
+    )
+
+
+async def test_square_connect_uses_production_base_when_env_is_production(
+    client, two_tenant_with_memberships, monkeypatch
+):
+    _square_env(monkeypatch, "production")
+    response = client.get(
+        f"/api/integrations/square/connect?restaurant_id={TENANT_A_ID}",
+        headers={"Authorization": "Bearer tenant_a"},
+    )
+    url = response.json()["connect_url"]
+    assert url.startswith("https://connect.squareup.com/oauth2/authorize")
+
+
+@pytest.mark.parametrize("environment", ["sandbox", "production"])
+async def test_square_callback_saves_single_location_and_env(
+    client, two_tenant_with_memberships, patched_server_db, monkeypatch, environment
+):
+    location, saved, integ = await _run_square_callback(
+        client, patched_server_db, monkeypatch, [_SQ_LOCATION], environment
+    )
+    from encryption_utils import decrypt_value
+
+    assert "status=connected" in location
+    assert "location=saved" in location
+    # Location ID stored encrypted, never in plaintext.
+    assert saved["square_location_id"] != "L_MAIN"
+    assert saved["square_location_id"].startswith("enc:")
+    assert decrypt_value(saved["square_location_id"]) == "L_MAIN"
+    assert saved["pos_env"] == environment
+    # Token fields are unchanged by the new logic.
+    assert decrypt_value(saved["square_access_token"]) == "sq_at_test"
+    assert decrypt_value(saved["square_refresh_token"]) == "sq_rt_test"
+    assert integ["location_status"] == "saved"
+    assert integ["active_location_count"] == 1
+
+
+@pytest.mark.parametrize(
+    "locations, status",
+    [
+        ([_SQ_LOCATION, {"id": "L_2", "name": "Airport"}], "select_required"),
+        ([], "none"),
+        (None, "lookup_failed"),
+    ],
+)
+async def test_square_callback_without_single_location_saves_none_and_still_connects(
+    client, two_tenant_with_memberships, patched_server_db, monkeypatch, locations, status
+):
+    # A location saved for a previous connection must not survive: it may belong
+    # to another merchant, and orders must never be guessed into a location.
+    from encryption_utils import encrypt_value
+
+    await patched_server_db.restaurants.update_one(
+        {"id": TENANT_A_ID}, {"$set": {"square_location_id": encrypt_value("L_OLD")}}
+    )
+    location, saved, integ = await _run_square_callback(
+        client, patched_server_db, monkeypatch, locations
+    )
+    assert "status=connected" in location
+    assert f"location={status}" in location
+    assert "square_location_id" not in saved
+    assert saved["square_connected"] is True
+    assert saved["pos_type"] == "square"
+    assert saved["pos_env"] == "sandbox"
+    assert integ["location_status"] == status
+    assert integ["active_location_count"] == (len(locations) if locations is not None else None)
+
+
+@pytest.mark.parametrize(
+    "environment, host",
+    [("sandbox", "connect.squareupsandbox.com"), ("production", "connect.squareup.com")],
+)
+async def test_order_dispatch_uses_credentials_saved_by_square_oauth(
+    client, two_tenant_with_memberships, patched_server_db, monkeypatch, environment, host
+):
+    """End to end: connect via OAuth (no manual Location ID), then dispatch an
+    order through the live path (decrypt at call start, db passed for refresh)."""
+    _, saved, _ = await _run_square_callback(
+        client, patched_server_db, monkeypatch, [_SQ_LOCATION], environment
+    )
+    # A different deploy-wide env must not override the restaurant's pos_env.
+    monkeypatch.setenv("SQUARE_ENVIRONMENT", "sandbox" if environment == "production" else "production")
+
+    import httpx
+    from encryption_utils import decrypt_sensitive_fields, ENCRYPTED_CREDENTIAL_FIELDS
+    from gemini_service import LiveOrder, OrderItem, send_order_to_kitchen
+
+    captured = {}
+
+    async def fake_post(self, url, **kwargs):
+        captured.update(url=url, json=kwargs.get("json"), headers=kwargs.get("headers"))
+        return httpx.Response(
+            200,
+            json={"order": {"id": "sq_order_1", "total_money": {"amount": 1407}, "total_tax_money": {"amount": 108}}},
+            request=httpx.Request("POST", url),
+        )
+
+    monkeypatch.setattr(httpx.AsyncClient, "post", fake_post)
+
+    restaurant = decrypt_sensitive_fields(saved, ENCRYPTED_CREDENTIAL_FIELDS)
+    order = LiveOrder(
+        restaurant_id=TENANT_A_ID, call_sid="call_oauth_1", caller_number="+15551234567",
+        customer_name="Joe", order_type="pickup",
+    )
+    order.items.append(OrderItem(name="Pizza", menu_item_id="p1", category="Pizza", unit_price=1299, quantity=1))
+
+    result = await send_order_to_kitchen(order, restaurant, patched_server_db)
+
+    assert result["success"] is True, result
+    assert result["method"] == "square"
+    assert result["order_id"] == "sq_order_1"
+    assert captured["url"] == f"https://{host}/v2/orders"
+    assert captured["json"]["order"]["location_id"] == "L_MAIN"
+    assert captured["headers"]["Authorization"] == "Bearer sq_at_test"
+
+
+async def test_order_dispatch_without_square_location_reports_clear_error(
+    client, two_tenant_with_memberships, patched_server_db, monkeypatch
+):
+    _, saved, _ = await _run_square_callback(
+        client, patched_server_db, monkeypatch, [_SQ_LOCATION, {"id": "L_2", "name": "Airport"}]
+    )
+    from encryption_utils import decrypt_sensitive_fields, ENCRYPTED_CREDENTIAL_FIELDS
+    from gemini_service import LiveOrder, OrderItem, SQUARE_LOCATION_MISSING_ERROR, send_order_to_kitchen
+
+    restaurant = decrypt_sensitive_fields(saved, ENCRYPTED_CREDENTIAL_FIELDS)
+    order = LiveOrder(restaurant_id=TENANT_A_ID, call_sid="call_oauth_2", caller_number="+15551234567")
+    order.items.append(OrderItem(name="Pizza", menu_item_id="p1", category="Pizza", unit_price=1299, quantity=1))
+
+    result = await send_order_to_kitchen(order, restaurant, patched_server_db)
+    assert result["success"] is False
+    assert result["error"] == SQUARE_LOCATION_MISSING_ERROR

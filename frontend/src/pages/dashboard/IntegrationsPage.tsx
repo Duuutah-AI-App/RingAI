@@ -108,7 +108,14 @@ function POSCard({ restaurantId, squareConnected, cloverConnected }: { restauran
           <div className="flex items-center justify-between p-4 rounded-xl border border-line hover:bg-cream transition-colors">
             <p className="text-sm font-medium">Square</p>
             {squareConnected ? (
-              <ConnectedBadge />
+              // Reconnecting re-runs OAuth, which replaces the stored token and
+              // re-reads the location — needed when the requested scopes change.
+              <div className="flex items-center gap-2">
+                <ConnectedBadge />
+                <Button variant="outline" size="sm" onClick={connectSquare} className="rounded-xl">
+                  Reconnect
+                </Button>
+              </div>
             ) : (
               <Button onClick={connectSquare} className="bg-coral hover:bg-coral-deep text-white rounded-xl hover:opacity-90">
                 Connect with Square

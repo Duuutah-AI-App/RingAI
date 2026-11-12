@@ -149,6 +149,39 @@ async def test_get_valid_square_token_near_expiry_refreshes_and_persists(async_d
     assert doc["square_token_expires_at"] == new_exp
 
 
+async def test_square_refresh_keeps_oauth_location_and_env(async_db, monkeypatch):
+    """A token refresh rewrites only the token fields: the location and pos_env
+    saved by the OAuth callback must survive, so orders keep their target."""
+    import pos_sync
+    from encryption_utils import decrypt_value, encrypt_value
+
+    async def _fake_refresh(rt):
+        return {"access_token": "sq_new_at", "refresh_token": "sq_new_rt", "expires_at": _rfc3339(2592000)}
+
+    monkeypatch.setattr(pos_sync, "refresh_square_token", _fake_refresh)
+    await async_db.restaurants.insert_one({
+        "id": RID,
+        "square_access_token": "enc:old",
+        "square_location_id": encrypt_value("L_MAIN"),
+        "pos_env": "sandbox",
+    })
+    restaurant = {
+        "id": RID,
+        "square_access_token": "old_tok",
+        "square_refresh_token": "old_rt",
+        "square_token_expires_at": _rfc3339(120),
+        "square_location_id": "L_MAIN",
+        "pos_env": "sandbox",
+    }
+    await pos_sync.get_valid_square_token(restaurant, async_db)
+
+    doc = await async_db.restaurants.find_one({"id": RID})
+    assert decrypt_value(doc["square_access_token"]) == "sq_new_at"
+    assert decrypt_value(doc["square_location_id"]) == "L_MAIN"
+    assert doc["pos_env"] == "sandbox"
+    assert restaurant["square_location_id"] == "L_MAIN"
+
+
 async def test_get_valid_square_token_keeps_refresh_token_when_not_rotated(async_db, monkeypatch):
     """Square does not rotate the refresh token on every refresh — when the
     response omits one, the existing refresh token must be preserved."""

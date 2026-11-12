@@ -1196,12 +1196,20 @@ def _build_square_fulfillment(order: LiveOrder) -> Dict[str, Any]:
     return _strip_none(fulfillment)
 
 
+SQUARE_LOCATION_MISSING_ERROR = (
+    "Square location not set — choose this restaurant's Square location in Integrations"
+)
+
+
 async def _send_to_square(order: LiveOrder, restaurant: Dict[str, Any], db=None) -> Dict[str, Any]:
     token = restaurant.get("square_access_token")
     location = restaurant.get("square_location_id")
-    if not token or not location:
+    if not token:
         return {"success": False, "order_id": "", "method": "square",
-                "error": "missing Square credentials"}
+                "error": "missing Square access token — reconnect Square"}
+    if not location:
+        return {"success": False, "order_id": "", "method": "square",
+                "error": SQUARE_LOCATION_MISSING_ERROR}
     env = restaurant.get("pos_env") or os.environ.get("SQUARE_ENVIRONMENT", "sandbox")
     base = "https://connect.squareupsandbox.com" if env == "sandbox" else "https://connect.squareup.com"
     body = {
@@ -1393,9 +1401,12 @@ async def _park_to_square(order, restaurant, db=None):
 
     token = restaurant.get("square_access_token")
     location = restaurant.get("square_location_id")
-    if not token or not location:
+    if not token:
         return {"success": False, "order_id": "", "method": "square_park",
-                "error": "missing Square credentials"}
+                "error": "missing Square access token — reconnect Square"}
+    if not location:
+        return {"success": False, "order_id": "", "method": "square_park",
+                "error": SQUARE_LOCATION_MISSING_ERROR}
     env = restaurant.get("pos_env") or os.environ.get("SQUARE_ENVIRONMENT", "sandbox")
     base = "https://connect.squareupsandbox.com" if env == "sandbox" else "https://connect.squareup.com"
 

@@ -12,11 +12,12 @@ vi.mock("@/lib/api", async () => {
     ...actual,
     getRestaurant: vi.fn(),
     getCalendarStatus: vi.fn(),
+    getSquareConnectUrl: vi.fn(),
   };
 });
 
 import IntegrationsPage from "@/pages/dashboard/IntegrationsPage";
-import { getRestaurant, getCalendarStatus } from "@/lib/api";
+import { getRestaurant, getCalendarStatus, getSquareConnectUrl } from "@/lib/api";
 
 function Shell() {
   return (
@@ -82,6 +83,23 @@ describe("IntegrationsPage", () => {
     await waitFor(() => expect(screen.getByRole("heading", { name: /Connect your POS/i })).toBeInTheDocument());
     expect(screen.queryByRole("button", { name: /Connect with Square/i })).not.toBeInTheDocument();
     expect(screen.getAllByText(/Connected/i).length).toBeGreaterThan(0);
+  });
+
+  it("offers Reconnect for a connected Square account and restarts OAuth", async () => {
+    // Re-authorizing is how existing connections pick up new OAuth scopes.
+    vi.mocked(getSquareConnectUrl).mockResolvedValue({ data: { connect_url: "" } } as never);
+    mockRestaurant({ square_connected: true });
+    renderWithProviders(<Shell />);
+    const reconnect = await screen.findByRole("button", { name: /^Reconnect$/i });
+    fireEvent.click(reconnect);
+    await waitFor(() => expect(getSquareConnectUrl).toHaveBeenCalledTimes(1));
+  });
+
+  it("does not show Reconnect when Square is not connected", async () => {
+    mockRestaurant({ square_connected: false });
+    renderWithProviders(<Shell />);
+    await screen.findByRole("button", { name: /Connect with Square/i });
+    expect(screen.queryByRole("button", { name: /^Reconnect$/i })).not.toBeInTheDocument();
   });
 
   it("shows a Connect with Square button when square_connected is false", async () => {
